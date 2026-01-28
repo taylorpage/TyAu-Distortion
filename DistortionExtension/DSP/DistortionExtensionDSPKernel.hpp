@@ -22,6 +22,53 @@ class DistortionExtensionDSPKernel {
 public:
     void initialize(int inputChannelCount, int outputChannelCount, double inSampleRate) {
         mSampleRate = inSampleRate;
+        initializeEQ(inSampleRate);
+    }
+
+    // Initialize pre-distortion EQ filters
+    void initializeEQ(double sampleRate) {
+        // Simple biquad filter coefficients for fixed EQ curve
+        // Low shelf: cut below 75Hz
+        // Presence boost: +1.5dB around 6-7kHz
+        // Gentle high cut above 10kHz
+
+        // For simplicity, using a single high-pass + presence shelf
+        // High-pass at 75Hz (removes low rumble before distortion)
+        float fc = 75.0f / sampleRate;
+        float Q = 0.707f;
+        float w0 = 2.0f * M_PI * fc;
+        float cosw0 = std::cos(w0);
+        float sinw0 = std::sin(w0);
+        float alpha = sinw0 / (2.0f * Q);
+
+        // High-pass coefficients
+        mHPF_b0 = (1.0f + cosw0) / 2.0f;
+        mHPF_b1 = -(1.0f + cosw0);
+        mHPF_b2 = (1.0f + cosw0) / 2.0f;
+        mHPF_a0 = 1.0f + alpha;
+        mHPF_a1 = -2.0f * cosw0;
+        mHPF_a2 = 1.0f - alpha;
+
+        // Normalize
+        mHPF_b0 /= mHPF_a0;
+        mHPF_b1 /= mHPF_a0;
+        mHPF_b2 /= mHPF_a0;
+        mHPF_a1 /= mHPF_a0;
+        mHPF_a2 /= mHPF_a0;
+    }
+
+    // Apply fixed pre-distortion EQ to shape tone
+    float applyPreEQ(float input, int channel) {
+        // High-pass filter at 75Hz (removes rumble/mud before distortion)
+        float hpf = mHPF_b0 * input + mHPF_b1 * mHPF_x1[channel] + mHPF_b2 * mHPF_x2[channel]
+                    - mHPF_a1 * mHPF_y1[channel] - mHPF_a2 * mHPF_y2[channel];
+
+        mHPF_x2[channel] = mHPF_x1[channel];
+        mHPF_x1[channel] = input;
+        mHPF_y2[channel] = mHPF_y1[channel];
+        mHPF_y1[channel] = hpf;
+
+        return hpf;
     }
     
     void deInitialize() {
@@ -36,6 +83,46 @@ public:
         mBypassed = shouldBypass;
     }
     
+    // MARK: - Oversampling Helpers
+
+    // Simple 2-point linear interpolation upsampler (per-channel)
+    void upsample2x(float input, float& out1, float& out2, int channel) {
+        out1 = input;
+        out2 = (input + mLastSample[channel]) * 0.5f;
+        mLastSample[channel] = input;
+    }
+
+    // Simple 2-point averaging downsampler with DC blocker (per-channel)
+    float downsample2x(float sample1, float sample2, int channel) {
+        float downsampled = (sample1 + sample2) * 0.5f;
+
+        // DC blocker (high-pass at ~5Hz)
+        float dcBlocked = downsampled - mDcBlockerZ1[channel] + 0.995f * mDcBlockerOutput[channel];
+        mDcBlockerZ1[channel] = downsampled;
+        mDcBlockerOutput[channel] = dcBlocked;
+
+        return dcBlocked;
+    }
+
+    // Clipping function extracted for reuse
+    float applyClipping(float sample) {
+        // Pure hard clipping with asymmetry for crunch and clarity
+        // Simple and artifact-free
+
+        // Asymmetric thresholds (tighter on positive for bite)
+        float positiveThreshold = 0.8f - (mDrive * 0.55f);  // 0.8 to 0.25
+        float negativeThreshold = 0.9f - (mDrive * 0.55f);  // 0.9 to 0.35
+
+        // Hard clip with asymmetry
+        if (sample > positiveThreshold) {
+            return positiveThreshold;
+        } else if (sample < -negativeThreshold) {
+            return -negativeThreshold;
+        } else {
+            return sample;
+        }
+    }
+
     // MARK: - Parameter Getter / Setter
     void setParameter(AUParameterAddress address, AUValue value) {
         switch (address) {
@@ -109,30 +196,24 @@ public:
             for (UInt32 frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
                 float input = inputBuffers[channel][frameIndex];
 
-                // Apply pre-gain based on drive (1.0 to 10.0)
-                float preGain = 1.0f + (mDrive * 9.0f);
-                float sample = input * preGain;
+                // Apply fixed pre-distortion EQ to shape tone
+                float eqed = applyPreEQ(input, channel);
 
-                // Apply progressive clipping (soft → hard transition)
-                float clipped;
-                if (mDrive < 0.5f) {
-                    // Soft clipping (tanh-based)
-                    float softAmount = mDrive * 2.0f;  // 0.0 to 1.0
-                    clipped = std::tanh(sample * (1.0f + softAmount));
-                } else {
-                    // Transition to hard clipping
-                    float hardAmount = (mDrive - 0.5f) * 2.0f;  // 0.0 to 1.0
-                    float threshold = 1.0f - (hardAmount * 0.3f);  // 1.0 to 0.7
+                // Apply pre-gain based on drive (1.0 to 6.0 for tighter response)
+                float preGain = 1.0f + (mDrive * 5.0f);
+                float gained = eqed * preGain;
 
-                    // Hard clip
-                    if (sample > threshold) {
-                        clipped = threshold;
-                    } else if (sample < -threshold) {
-                        clipped = -threshold;
-                    } else {
-                        clipped = std::tanh(sample);
-                    }
-                }
+                // 2x Oversampling:
+                // 1. Upsample to 2x sample rate (creates 2 samples from 1)
+                float upsampled1, upsampled2;
+                upsample2x(gained, upsampled1, upsampled2, channel);
+
+                // 2. Apply clipping to both oversampled samples
+                float clipped1 = applyClipping(upsampled1);
+                float clipped2 = applyClipping(upsampled2);
+
+                // 3. Downsample back to original rate
+                float clipped = downsample2x(clipped1, clipped2, channel);
 
                 // Apply makeup gain to compensate for clipping
                 float makeupGain = 1.0f / (1.0f + mDrive * 0.5f);
@@ -166,4 +247,17 @@ public:
     float mDrive = 0.5f;  // 0.0 to 1.0
     bool mBypassed = false;
     AUAudioFrameCount mMaxFramesToRender = 1024;
+
+    // Oversampling state variables (per-channel, max 8 channels)
+    float mLastSample[8] = {0.0f};
+    float mDcBlockerZ1[8] = {0.0f};
+    float mDcBlockerOutput[8] = {0.0f};
+
+    // Pre-distortion EQ filter state (per-channel)
+    // High-pass filter coefficients
+    float mHPF_b0 = 0.0f, mHPF_b1 = 0.0f, mHPF_b2 = 0.0f;
+    float mHPF_a0 = 1.0f, mHPF_a1 = 0.0f, mHPF_a2 = 0.0f;
+    // High-pass filter state
+    float mHPF_x1[8] = {0.0f}, mHPF_x2[8] = {0.0f};
+    float mHPF_y1[8] = {0.0f}, mHPF_y2[8] = {0.0f};
 };

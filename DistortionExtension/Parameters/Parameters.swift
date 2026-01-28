@@ -15,8 +15,8 @@ let DistortionExtensionParameterSpecs = ParameterTreeSpec {
             identifier: "drive",
             name: "Drive",
             units: .percent,
-            valueRange: 0.0...1.0,
-            defaultValue: 0.5
+            valueRange: 0.4...1.0,
+            defaultValue: 0.7
         )
     }
 }
