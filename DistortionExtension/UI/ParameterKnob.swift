@@ -28,8 +28,8 @@ struct ParameterKnob: View {
     // Convert parameter value (0-1 normalized) to angle
     var angle: Angle {
         let normalizedValue = (param.value - param.min) / (param.max - param.min)
-        let startAngle: Double = 135 // Start at bottom-left
-        let endAngle: Double = 405   // End at bottom-right (270 degrees of rotation)
+        let startAngle: Double = -135 // Start at bottom-left (7 o'clock)
+        let endAngle: Double = 135    // End at bottom-right (5 o'clock - 270 degrees of rotation)
         let angleRange = endAngle - startAngle
         return Angle(degrees: startAngle + (Double(normalizedValue) * angleRange))
     }
@@ -50,7 +50,7 @@ struct ParameterKnob: View {
                         style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
                     )
                     .frame(width: knobSize, height: knobSize)
-                    .rotationEffect(Angle(degrees: 135))
+                    .rotationEffect(Angle(degrees: -135))
 
                 // Knob body
                 Circle()

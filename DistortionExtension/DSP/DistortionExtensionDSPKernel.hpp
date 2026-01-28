@@ -85,16 +85,21 @@ public:
     
     // MARK: - Oversampling Helpers
 
-    // Simple 2-point linear interpolation upsampler (per-channel)
-    void upsample2x(float input, float& out1, float& out2, int channel) {
-        out1 = input;
-        out2 = (input + mLastSample[channel]) * 0.5f;
+    // Simple 4-point linear interpolation upsampler (4x oversampling, per-channel)
+    void upsample4x(float input, float out[4], int channel) {
+        // Create 4 samples from 1 using linear interpolation
+        float prev = mLastSample[channel];
+        out[0] = prev + (input - prev) * 0.25f;
+        out[1] = prev + (input - prev) * 0.50f;
+        out[2] = prev + (input - prev) * 0.75f;
+        out[3] = input;
         mLastSample[channel] = input;
     }
 
-    // Simple 2-point averaging downsampler with DC blocker (per-channel)
-    float downsample2x(float sample1, float sample2, int channel) {
-        float downsampled = (sample1 + sample2) * 0.5f;
+    // Simple 4-point averaging downsampler with DC blocker (per-channel)
+    float downsample4x(float sample1, float sample2, float sample3, float sample4, int channel) {
+        // Average all 4 samples
+        float downsampled = (sample1 + sample2 + sample3 + sample4) * 0.25f;
 
         // DC blocker (high-pass at ~5Hz)
         float dcBlocked = downsampled - mDcBlockerZ1[channel] + 0.995f * mDcBlockerOutput[channel];
@@ -107,11 +112,11 @@ public:
     // Clipping function extracted for reuse
     float applyClipping(float sample) {
         // Pure hard clipping with asymmetry for crunch and clarity
-        // Simple and artifact-free
+        // Aggressive thresholds for cutting through mix
 
         // Asymmetric thresholds (tighter on positive for bite)
-        float positiveThreshold = 0.8f - (mDrive * 0.55f);  // 0.8 to 0.25
-        float negativeThreshold = 0.9f - (mDrive * 0.55f);  // 0.9 to 0.35
+        float positiveThreshold = 0.7f - (mDrive * 0.60f);  // 0.7 to 0.1
+        float negativeThreshold = 0.8f - (mDrive * 0.60f);  // 0.8 to 0.2
 
         // Hard clip with asymmetry
         if (sample > positiveThreshold) {
@@ -199,24 +204,27 @@ public:
                 // Apply fixed pre-distortion EQ to shape tone
                 float eqed = applyPreEQ(input, channel);
 
-                // Apply pre-gain based on drive (1.0 to 6.0 for tighter response)
-                float preGain = 1.0f + (mDrive * 5.0f);
+                // Apply pre-gain based on drive (more aggressive for cutting through mix)
+                float preGain = 1.0f + (mDrive * 12.0f);  // 1.0x to 13.0x
                 float gained = eqed * preGain;
 
-                // 2x Oversampling:
-                // 1. Upsample to 2x sample rate (creates 2 samples from 1)
-                float upsampled1, upsampled2;
-                upsample2x(gained, upsampled1, upsampled2, channel);
+                // 4x Oversampling:
+                // 1. Upsample to 4x sample rate (creates 4 samples from 1)
+                float upsampled[4];
+                upsample4x(gained, upsampled, channel);
 
-                // 2. Apply clipping to both oversampled samples
-                float clipped1 = applyClipping(upsampled1);
-                float clipped2 = applyClipping(upsampled2);
+                // 2. Apply clipping to all 4 oversampled samples
+                float clipped1 = applyClipping(upsampled[0]);
+                float clipped2 = applyClipping(upsampled[1]);
+                float clipped3 = applyClipping(upsampled[2]);
+                float clipped4 = applyClipping(upsampled[3]);
 
                 // 3. Downsample back to original rate
-                float clipped = downsample2x(clipped1, clipped2, channel);
+                float clipped = downsample4x(clipped1, clipped2, clipped3, clipped4, channel);
 
-                // Apply makeup gain to compensate for clipping
-                float makeupGain = 1.0f / (1.0f + mDrive * 0.5f);
+                // Apply makeup gain to maintain consistent volume
+                // Progressive boost with extra compensation at maximum drive
+                float makeupGain = 1.0f + (mDrive * 2.5f);  // 1.0x to 3.5x
                 float output = clipped * makeupGain;
 
                 outputBuffers[channel][frameIndex] = output;
