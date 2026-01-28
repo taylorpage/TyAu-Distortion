@@ -13,7 +13,6 @@
 #import <span>
 
 #import "DistortionExtensionParameterAddresses.h"
-#include "../../../../TyAu-Tube/TaylorAggressiveTube.hpp"
 
 /*
  DistortionExtensionDSPKernel
@@ -23,7 +22,6 @@ class DistortionExtensionDSPKernel {
 public:
     void initialize(int inputChannelCount, int outputChannelCount, double inSampleRate) {
         mSampleRate = inSampleRate;
-        mTubeSaturation.setSampleRate(inSampleRate);
     }
     
     void deInitialize() {
@@ -41,11 +39,8 @@ public:
     // MARK: - Parameter Getter / Setter
     void setParameter(AUParameterAddress address, AUValue value) {
         switch (address) {
-            case DistortionExtensionParameterAddress::gain:
-                mGain = value;
-                break;
-            case DistortionExtensionParameterAddress::tubeDrive:
-                mTubeSaturation.setDrive(value);
+            case DistortionExtensionParameterAddress::drive:
+                mDrive = value;
                 break;
         }
     }
@@ -54,10 +49,8 @@ public:
         // Return the goal. It is not thread safe to return the ramping value.
 
         switch (address) {
-            case DistortionExtensionParameterAddress::gain:
-                return (AUValue)mGain;
-            case DistortionExtensionParameterAddress::tubeDrive:
-                return (AUValue)mTubeSaturation.getDrive();
+            case DistortionExtensionParameterAddress::drive:
+                return (AUValue)mDrive;
 
             default: return 0.f;
         }
@@ -116,13 +109,36 @@ public:
             for (UInt32 frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
                 float input = inputBuffers[channel][frameIndex];
 
-                // Apply gain
-                float processed = input * mGain;
+                // Apply pre-gain based on drive (1.0 to 10.0)
+                float preGain = 1.0f + (mDrive * 9.0f);
+                float sample = input * preGain;
 
-                // Apply tube saturation
-                processed = mTubeSaturation.processSample(processed);
+                // Apply progressive clipping (soft → hard transition)
+                float clipped;
+                if (mDrive < 0.5f) {
+                    // Soft clipping (tanh-based)
+                    float softAmount = mDrive * 2.0f;  // 0.0 to 1.0
+                    clipped = std::tanh(sample * (1.0f + softAmount));
+                } else {
+                    // Transition to hard clipping
+                    float hardAmount = (mDrive - 0.5f) * 2.0f;  // 0.0 to 1.0
+                    float threshold = 1.0f - (hardAmount * 0.3f);  // 1.0 to 0.7
 
-                outputBuffers[channel][frameIndex] = processed;
+                    // Hard clip
+                    if (sample > threshold) {
+                        clipped = threshold;
+                    } else if (sample < -threshold) {
+                        clipped = -threshold;
+                    } else {
+                        clipped = std::tanh(sample);
+                    }
+                }
+
+                // Apply makeup gain to compensate for clipping
+                float makeupGain = 1.0f / (1.0f + mDrive * 0.5f);
+                float output = clipped * makeupGain;
+
+                outputBuffers[channel][frameIndex] = output;
             }
         }
     }
@@ -147,9 +163,7 @@ public:
     AUHostMusicalContextBlock mMusicalContextBlock;
 
     double mSampleRate = 44100.0;
-    double mGain = 1.0;
+    float mDrive = 0.5f;  // 0.0 to 1.0
     bool mBypassed = false;
     AUAudioFrameCount mMaxFramesToRender = 1024;
-
-    TaylorAggressiveTube mTubeSaturation;
 };

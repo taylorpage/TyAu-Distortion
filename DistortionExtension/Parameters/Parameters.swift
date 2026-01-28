@@ -11,20 +11,12 @@ import AudioToolbox
 let DistortionExtensionParameterSpecs = ParameterTreeSpec {
     ParameterGroupSpec(identifier: "global", name: "Global") {
         ParameterSpec(
-            address: .gain,
-            identifier: "gain",
-            name: "Output Gain",
-            units: .linearGain,
+            address: .drive,
+            identifier: "drive",
+            name: "Drive",
+            units: .percent,
             valueRange: 0.0...1.0,
-            defaultValue: 0.25
-        )
-        ParameterSpec(
-            address: .tubeDrive,
-            identifier: "tubeDrive",
-            name: "Tube Drive",
-            units: .generic,
-            valueRange: 1.0...15.0,
-            defaultValue: 9.0
+            defaultValue: 0.5
         )
     }
 }

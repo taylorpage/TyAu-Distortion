@@ -11,9 +11,8 @@ struct DistortionExtensionMainView: View {
     var parameterTree: ObservableAUParameterGroup
 
     var body: some View {
-        HStack(spacing: 40) {
-            ParameterKnob(param: parameterTree.global.gain)
-            ParameterKnob(param: parameterTree.global.tubeDrive)
+        VStack(spacing: 20) {
+            ParameterKnob(param: parameterTree.global.drive)
         }
         .padding()
     }

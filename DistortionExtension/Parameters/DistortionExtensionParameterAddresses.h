@@ -10,6 +10,5 @@
 #include <AudioToolbox/AUParameters.h>
 
 typedef NS_ENUM(AUParameterAddress, DistortionExtensionParameterAddress) {
-    gain = 0,
-    tubeDrive = 1
+    drive = 0
 };
