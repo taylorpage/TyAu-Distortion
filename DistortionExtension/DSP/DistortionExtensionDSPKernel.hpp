@@ -134,6 +134,9 @@ public:
             case DistortionExtensionParameterAddress::drive:
                 mDrive = value;
                 break;
+            case DistortionExtensionParameterAddress::bypass:
+                mBypassed = (value >= 0.5f);
+                break;
         }
     }
 
@@ -143,6 +146,8 @@ public:
         switch (address) {
             case DistortionExtensionParameterAddress::drive:
                 return (AUValue)mDrive;
+            case DistortionExtensionParameterAddress::bypass:
+                return (AUValue)(mBypassed ? 1.0f : 0.0f);
 
             default: return 0.f;
         }

@@ -10,5 +10,6 @@
 #include <AudioToolbox/AUParameters.h>
 
 typedef NS_ENUM(AUParameterAddress, DistortionExtensionParameterAddress) {
-    drive = 0
+    drive = 0,
+    bypass = 1
 };

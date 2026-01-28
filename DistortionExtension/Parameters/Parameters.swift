@@ -18,6 +18,14 @@ let DistortionExtensionParameterSpecs = ParameterTreeSpec {
             valueRange: 0.4...1.0,
             defaultValue: 0.7
         )
+        ParameterSpec(
+            address: .bypass,
+            identifier: "bypass",
+            name: "Bypass",
+            units: .boolean,
+            valueRange: 0.0...1.0,
+            defaultValue: 0.0
+        )
     }
 }
 

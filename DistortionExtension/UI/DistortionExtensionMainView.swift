@@ -12,7 +12,10 @@ struct DistortionExtensionMainView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            ParameterKnob(param: parameterTree.global.drive)
+            HStack(spacing: 30) {
+                ParameterKnob(param: parameterTree.global.drive)
+                BypassButton(param: parameterTree.global.bypass)
+            }
         }
         .padding()
     }
