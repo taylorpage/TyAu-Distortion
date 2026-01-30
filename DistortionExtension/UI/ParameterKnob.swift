@@ -13,8 +13,8 @@ struct ParameterKnob: View {
     @State private var isDragging = false
     @State private var lastDragValue: CGFloat = 0
 
-    let knobSize: CGFloat = 80
-    let strokeWidth: CGFloat = 8
+    let knobSize: CGFloat = 120
+    let scaleRadius: CGFloat = 95
 
     var specifier: String {
         switch param.unit {
@@ -35,80 +35,83 @@ struct ParameterKnob: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                // Background circle
-                Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: strokeWidth)
-                    .frame(width: knobSize, height: knobSize)
+        ZStack {
+            // Scale markings (0-10)
+            ForEach(0..<11) { i in
+                VStack {
+                    // Tick mark
+                    Rectangle()
+                        .fill(Color.white.opacity(0.8))
+                        .frame(width: i % 2 == 0 ? 2 : 1, height: i % 2 == 0 ? 12 : 8)
 
-                // Value arc
-                Circle()
-                    .trim(from: 0, to: CGFloat((param.value - param.min) / (param.max - param.min)))
-                    .stroke(
-                        Color.blue,
-                        style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round)
-                    )
-                    .frame(width: knobSize, height: knobSize)
-                    .rotationEffect(Angle(degrees: -135))
+                    // Number labels (only at even positions)
+                    if i % 2 == 0 {
+                        Text("\(i)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .offset(y: 6)
+                    }
+                }
+                .offset(y: -scaleRadius)
+                .rotationEffect(Angle(degrees: -135 + (270.0 / 10.0) * Double(i)))
+            }
 
-                // Knob body
+            // Knob image with rotation
+            if let knobImage = NSImage(named: "knob") {
+                Image(nsImage: knobImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: knobSize, height: knobSize)
+                    .rotationEffect(angle)
+                    .shadow(color: .black.opacity(0.5), radius: 6, x: 0, y: 3)
+            } else {
+                // Fallback if image not found
                 Circle()
                     .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.gray.opacity(0.8), Color.gray.opacity(0.4)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                Color(red: 0.3, green: 0.3, blue: 0.3),
+                                Color(red: 0.15, green: 0.15, blue: 0.15),
+                                Color(red: 0.25, green: 0.25, blue: 0.25)
+                            ]),
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: knobSize / 2
                         )
                     )
-                    .frame(width: knobSize - strokeWidth * 2, height: knobSize - strokeWidth * 2)
+                    .frame(width: knobSize, height: knobSize)
                     .overlay(
                         Circle()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            .stroke(Color.black.opacity(0.6), lineWidth: 3)
                     )
-
-                // Indicator line
-                Rectangle()
-                    .fill(Color.white)
-                    .frame(width: 3, height: knobSize / 3)
-                    .offset(y: -knobSize / 4)
-                    .rotationEffect(angle)
+                    .shadow(color: .black.opacity(0.5), radius: 6, x: 0, y: 3)
             }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        if !isDragging {
-                            isDragging = true
-                            lastDragValue = gesture.translation.height
-                            param.onEditingChanged(true)
-                        }
-
-                        // Vertical drag to control value
-                        let delta = lastDragValue - gesture.translation.height
-                        let sensitivity: CGFloat = 0.005
-                        let valueChange = Float(delta * sensitivity) * (param.max - param.min)
-
-                        let newValue = param.value + valueChange
-                        param.value = min(max(newValue, param.min), param.max)
-
-                        lastDragValue = gesture.translation.height
-                    }
-                    .onEnded { _ in
-                        isDragging = false
-                        param.onEditingChanged(false)
-                    }
-            )
-
-            // Parameter name
-            Text(param.displayName)
-                .font(.caption)
-                .foregroundColor(.primary)
-
-            // Parameter value
-            Text("\(param.value, specifier: specifier)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
         }
+        .frame(width: 200, height: 200)
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { gesture in
+                    if !isDragging {
+                        isDragging = true
+                        lastDragValue = gesture.translation.height
+                        param.onEditingChanged(true)
+                    }
+
+                    // Vertical drag to control value
+                    let delta = lastDragValue - gesture.translation.height
+                    let sensitivity: CGFloat = 0.005
+                    let valueChange = Float(delta * sensitivity) * (param.max - param.min)
+
+                    let newValue = param.value + valueChange
+                    param.value = min(max(newValue, param.min), param.max)
+
+                    lastDragValue = gesture.translation.height
+                }
+                .onEnded { _ in
+                    isDragging = false
+                    param.onEditingChanged(false)
+                }
+        )
         .accessibility(identifier: param.displayName)
     }
 }

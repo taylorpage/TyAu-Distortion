@@ -2,71 +2,62 @@
 //  BypassButton.swift
 //  DistortionExtension
 //
-//  A bypass button with indicator light for audio effect bypass
+//  A stomp switch button for audio effect bypass
 //
 
 import SwiftUI
 
 struct BypassButton: View {
     @State var param: ObservableAUParameter
+    @State private var isPressed = false
 
-    let buttonSize: CGFloat = 60
-    let indicatorSize: CGFloat = 12
+    let switchSize: CGFloat = 70
 
     var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                // Button background
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.gray.opacity(0.6),
-                                Color.gray.opacity(0.3)
-                            ]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: buttonSize, height: buttonSize)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.white.opacity(0.2), lineWidth: 2)
-                    )
-                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-
-                // Button label
-                Text(param.boolValue ? "OFF" : "ON")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-
-                // Indicator light (top-right corner)
-                Circle()
-                    .fill(param.boolValue ? Color.gray.opacity(0.3) : Color.green)
-                    .frame(width: indicatorSize, height: indicatorSize)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.black.opacity(0.4), lineWidth: 1)
-                    )
-                    .shadow(
-                        color: param.boolValue ? .clear : .green.opacity(0.8),
-                        radius: param.boolValue ? 0 : 4,
-                        x: 0,
-                        y: 0
-                    )
-                    .offset(x: buttonSize / 3, y: -buttonSize / 3)
-            }
-            .onTapGesture {
-                param.onEditingChanged(true)
-                param.boolValue.toggle()
-                param.onEditingChanged(false)
+        ZStack {
+            // Base stomp mechanism (always visible)
+            if let stompImage = NSImage(named: "stomp") {
+                Image(nsImage: stompImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: switchSize, height: switchSize)
+                    .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
             }
 
-            // Parameter name
-            Text(param.displayName)
-                .font(.caption)
-                .foregroundColor(.primary)
+            // Stomp button (animated on press)
+            if let stompButtonImage = NSImage(named: "stompButton") {
+                Image(nsImage: stompButtonImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: switchSize * 0.88, height: switchSize * 0.88)
+                    // Scale down and add slight vertical offset when pressed
+                    .scaleEffect(isPressed ? 0.97 : 1.0)
+                    .offset(y: isPressed ? 1.5 : 0)
+                    .shadow(color: .black.opacity(isPressed ? 0.3 : 0.4),
+                           radius: isPressed ? 2 : 4,
+                           x: 0,
+                           y: isPressed ? 1 : 2)
+            }
         }
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    if !isPressed {
+                        withAnimation(.easeInOut(duration: 0.05)) {
+                            isPressed = true
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(.easeInOut(duration: 0.05)) {
+                        isPressed = false
+                    }
+                    // Toggle bypass state
+                    param.onEditingChanged(true)
+                    param.boolValue.toggle()
+                    param.onEditingChanged(false)
+                }
+        )
         .accessibility(identifier: param.displayName)
     }
 }
