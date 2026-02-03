@@ -13,8 +13,8 @@ struct ParameterKnob: View {
     @State private var isDragging = false
     @State private var lastDragValue: CGFloat = 0
 
-    let knobSize: CGFloat = 120
-    let scaleRadius: CGFloat = 95
+    let knobSize: CGFloat = 140
+    let scaleRadius: CGFloat = 80
 
     var specifier: String {
         switch param.unit {
@@ -36,22 +36,18 @@ struct ParameterKnob: View {
 
     var body: some View {
         ZStack {
-            // Scale markings (0-10)
+            // Scale markings (0-10) - Yellow triangles pointing inward
             ForEach(0..<11) { i in
-                VStack {
-                    // Tick mark
-                    Rectangle()
-                        .fill(Color.white.opacity(0.8))
-                        .frame(width: i % 2 == 0 ? 2 : 1, height: i % 2 == 0 ? 12 : 8)
-
-                    // Number labels (only at even positions)
-                    if i % 2 == 0 {
-                        Text("\(i)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white.opacity(0.9))
-                            .offset(y: 6)
-                    }
+                // Yellow triangle tick mark
+                Path { path in
+                    let size: CGFloat = i % 2 == 0 ? 12 : 8
+                    path.move(to: CGPoint(x: 0, y: size))  // Point at bottom (facing inward)
+                    path.addLine(to: CGPoint(x: -size * 0.4, y: 0))
+                    path.addLine(to: CGPoint(x: size * 0.4, y: 0))
+                    path.closeSubpath()
                 }
+                .fill(Color(red: 1.0, green: 0.85, blue: 0.3))
+                .frame(width: 12, height: 12)
                 .offset(y: -scaleRadius)
                 .rotationEffect(Angle(degrees: -135 + (270.0 / 10.0) * Double(i)))
             }
