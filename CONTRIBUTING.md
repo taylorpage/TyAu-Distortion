@@ -1,6 +1,6 @@
-# Contributing to TyAu-Distortion
+# Contributing to TyAu-TubeCity
 
-Thank you for contributing to TyAu-Distortion! This document outlines our commit message standards and contribution guidelines.
+Thank you for contributing to TyAu-TubeCity! This document outlines our commit message standards and contribution guidelines.
 
 ## Git Commit Message Standards
 
@@ -34,7 +34,7 @@ The type must be one of the following:
 
 ### Scope
 
-The scope is optional and should specify the place of the commit change. Examples for TyAu-Distortion:
+The scope is optional and should specify the place of the commit change. Examples for TyAu-TubeCity:
 
 - `ui`
 - `dsp`
@@ -71,7 +71,7 @@ Breaking Changes should start with the word `BREAKING CHANGE:` with a space or t
 ```
 feat(dsp): add soft clipping algorithm
 
-Implement soft clipping to provide smoother distortion character.
+Implement soft clipping to provide smoother tubecity character.
 This allows for more musical-sounding saturation.
 
 Closes #42
