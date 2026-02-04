@@ -21,20 +21,47 @@ struct DistortionExtensionMainView: View {
                 )
                 .shadow(color: .black.opacity(0.5), radius: 8, x: 0, y: 4)
 
-            // Pizza Fuzz graphic - BACKGROUND IMAGE
+            // Pizza Fuzz graphic - BACKGROUND IMAGE (clipped to white border area)
             if let pizzaImage = NSImage(named: "pizzaFuzz") {
                 Image(nsImage: pizzaImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 320, height: 350)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 350)
+                    .offset(y: 60)
+                    .padding(.horizontal, 12)
                     .clipped()
-                    .offset(y: 40)
             }
 
             // White border inset (classic pedal look)
             RoundedRectangle(cornerRadius: 6)
                 .stroke(Color.white.opacity(0.9), lineWidth: 2)
                 .padding(12)
+
+            // Input jack (left side)
+            HStack {
+                if let jackLeftImage = NSImage(named: "jackLeft") {
+                    Image(nsImage: jackLeftImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20)
+                        .offset(x: -21)
+                }
+                Spacer()
+            }
+            .padding(.top, 20)
+
+            // Output jack (right side)
+            HStack {
+                Spacer()
+                if let jackRightImage = NSImage(named: "jackRight") {
+                    Image(nsImage: jackRightImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18)
+                        .offset(x: 20)
+                }
+            }
+            .padding(.top, 20)
 
             VStack(spacing: 0) {
                 // 9V Power indicator
@@ -90,7 +117,7 @@ struct DistortionExtensionMainView: View {
 
                 // Drive knob
                 ParameterKnob(param: parameterTree.global.drive)
-                    .padding(.bottom, 130)
+                    .padding(.bottom, 145)
 
                 Spacer()
 
