@@ -14,7 +14,7 @@ struct ParameterKnob: View {
     @State private var lastDragValue: CGFloat = 0
 
     let knobSize: CGFloat = 140
-    let scaleRadius: CGFloat = 80
+    let scaleRadius: CGFloat = 65  // Closer to knob edge
 
     var specifier: String {
         switch param.unit {
